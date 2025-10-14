@@ -30,6 +30,10 @@ class ServiceCenter(object):
     def next_day(self):
         new_day = self.current_time + datetime.timedelta(days=1)
         self.current_time = new_day.replace(hour=9, minute=0, second=0, microsecond=0)
+        self.queue = 0;
+        self.arrived_clients = 0
+        self.lost_clients = 0
+        self.current_client.device = None
     
     def client_arrived(self):
         is_end_of_day = self.current_time.hour == WORK_HOURS_FRAMES.get("17-18")[1]
@@ -70,7 +74,8 @@ class ServiceCenter(object):
                 self.current_client.set_up_device();
                 self.queue -= 1
                 self.served_clients += 1
-                self.statistics.change_info(self.current_time, self.arrived_clients, self.lost_clients, self.queue, self.current_client.device.price)
+                self.statistics.change_info(self.current_time, self.arrived_clients, self.lost_clients,
+                    self.queue, self.current_client.device.price)
             
             avaiable_time -= self.current_client.device.time_to_repair_in_minutes
             

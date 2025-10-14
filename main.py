@@ -8,8 +8,8 @@ START_DATE = start_date = datetime.datetime(2025, 10, 13, 9)
 WORK_HOURS = 9
 WORK_DAYS = 5
 
-def get_client_arrived_stats(service):
-    _, _, patches  = plt.hist(service.statistics.df['Clients Arrived'], bins=range(0, 10), edgecolor='white', label='Clients Occurance')
+def get_client_arrived_stats(stats):
+    _, _, patches  = plt.hist(stats.df['Clients Arrived'], bins=range(0, 10), edgecolor='white', label='Clients Occurance')
     plt.title('Histogram of Hourly Client Arrivals')
     plt.xlabel('Clients per hour')
     plt.xticks(range(0, 11))
@@ -31,24 +31,24 @@ def get_client_arrived_stats(service):
     plt.legend()
     plt.show()
 
-def get_queue_length_stats(service):
-    service.statistics.df['Time'] = pd.to_datetime(service.statistics.df['Time'])
-    
+def get_queue_length_stats(stats):
+    stats.df['Time'] = pd.to_datetime(stats.df['Time'])
     plt.figure(figsize=(10, 5))
-    plt.plot(service.statistics.df['Time'], service.statistics.df['Queue length'],  linestyle='--', color='lightblue')
-    plt.scatter(service.statistics.df['Time'], service.statistics.df['Queue length'], color='blue', label='Queue Size')
+    plt.scatter(stats.df['Time'], stats.df['Queue length'], color='blue', label='Queue Size')
+    plt.plot(stats.df['Time'], stats.df['Queue length'],  linestyle='--', color='lightblue')
     ax = plt.gca()
-    ax.set_xlim(START_DATE, service.statistics.df['Time'].max())
+    ax.set_xlim(START_DATE, stats.df['Time'].max())
     plt.xticks(rotation=45)
     plt.title('Queue Length Over Time')
     plt.xlabel('Time (Month, Day, Time)')
     plt.ylabel('Clients in Queue')
     plt.tight_layout()
     plt.legend()
+    plt.grid()
     plt.show()
 
-def get_arrived_vs_rejected_stats(service):
-    totals = service.statistics.df[['Clients Arrived', 'Lost Clients']].sum()
+def get_arrived_vs_rejected_stats(stats):
+    totals = stats.df[['Clients Arrived', 'Lost Clients']].sum()
     ax = totals.plot(kind='bar', color=['limegreen', 'lightcoral'])
     plt.title('Total Clients Arrived vs Rejected')
     
@@ -71,17 +71,18 @@ def get_arrived_vs_rejected_stats(service):
     plt.legend(handles=[arrived_patch, lost_patch])
     plt.show()
 
-def get_profit_stats(service):
+def get_profit_stats(stats):
     plt.figure(figsize=(10, 5))
-    plt.plot_date(service.statistics.df['Time'], service.statistics.df['Profit'].cumsum(), label="Service Center's profit")
+    plt.plot_date(stats.df['Time'], stats.df['Profit'].cumsum(), label="Service Center's profit")
     ax = plt.gca()
-    ax.set_xlim(START_DATE, service.statistics.df['Time'].max())
+    ax.set_xlim(START_DATE, stats.df['Time'].max())
     plt.title('Cumulative Profit Over Time')
     plt.xlabel('Time (Month, Day, Time)')
     plt.ylabel('Profit (imaginary units)')
     plt.xticks(rotation=45)
     plt.tight_layout()
     plt.legend()
+    plt.grid()
     plt.show()
 
 def run_simulation():
@@ -104,20 +105,47 @@ def run_simulation():
         service.get_intermediate_info()
         service.get_general_info()
     
+    return service.statistics
+
+def get_simulation_results():
+    stats = run_simulation()
+    
     print(f"---------- [ LOGS ] ----------")
-    print(service.statistics.df)
+    print(stats.df)
     print(f"---------- [ END OF LOGS ] ----------")
     print(f"---------- [ PROFIT ] ----------")
-    print(f"Profit after full working week:  {service.statistics.df['Profit'].sum()} 💸")
+    print(f"Profit after full working week:  {stats.df['Profit'].sum()} 💸")
     print(f"---------- [ ------ ] ----------")
     print(f"---------- [ Clients ] ----------")
-    print(f"Lost Clients after full working week:  {service.statistics.df['Lost Clients'].sum()} 💔")
-    print(f"Lost Clients after full working week:  {service.statistics.df['Clients Arrived'].sum()} 😃")
+    print(f"Lost Clients after full working week:  {stats.df['Lost Clients'].sum()} 💔")
+    print(f"New Clients after full working week:  {stats.df['Clients Arrived'].sum()} 😃")
     print(f"---------- [ ------ ] ----------")
 
-    get_client_arrived_stats(service)
-    get_queue_length_stats(service)
-    get_arrived_vs_rejected_stats(service)
-    get_profit_stats(service)
+    get_client_arrived_stats(stats)
+    get_queue_length_stats(stats)
+    get_arrived_vs_rejected_stats(stats)
+    get_profit_stats(stats)
 
-run_simulation()
+def get_100_simulation_results():
+    all_dfs = []
+    
+    for i in range(0, 100):
+        stats = run_simulation()
+        df = stats.df.copy()
+        df['Run'] = i
+        all_dfs.append(df)
+
+    combined_df = pd.concat(all_dfs, ignore_index=True)
+    simulation_sums = combined_df.groupby('Run')[['Profit', 'Clients Arrived', 'Lost Clients']].sum()
+    
+    avg_profit = simulation_sums['Profit'].mean()
+    avg_clients = simulation_sums['Clients Arrived'].mean()
+    avg_lost = simulation_sums['Lost Clients'].mean()
+    
+    print("\n🔢 Average Results Over 100 Simulations:")
+    print(f"📈 Average Profit: {avg_profit:.2f} 💸")
+    print(f"👥 Average Clients Arrived: {avg_clients:.0f}")
+    print(f"💔 Average Lost Clients: {avg_lost:.0f}")
+
+get_simulation_results()
+# get_100_simulation_results()
