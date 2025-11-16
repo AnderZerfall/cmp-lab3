@@ -85,8 +85,9 @@ def get_profit_stats(stats):
     plt.grid()
     plt.show()
 
-def run_simulation():
-    service = ServiceCenter(START_DATE)
+def run_simulation(channels = 1):
+    
+    service = ServiceCenter(START_DATE, channels=channels)
     work_hours_in_week = WORK_HOURS * WORK_DAYS
     i = 0
 
@@ -108,7 +109,16 @@ def run_simulation():
     return service.statistics
 
 def get_simulation_results():
-    stats = run_simulation()
+    num_channels = 1
+        
+    try:
+        num_channels = int(input("Enter the number of channels: "))
+        if num_channels < 1:
+            print("Number of channels must be at least 1. Using default value of 1.")
+    except ValueError:
+        print("Invalid input. Using default value of 1.")
+            
+    stats = run_simulation(num_channels)
     
     print(f"---------- [ LOGS ] ----------")
     print(stats.df)
@@ -129,8 +139,17 @@ def get_simulation_results():
 def get_100_simulation_results():
     all_dfs = []
     
+    num_channels = 1
+        
+    try:
+        num_channels = int(input("Enter the number of channels: "))
+        if num_channels < 1:
+            print("Number of channels must be at least 1. Using default value of 1.")
+    except ValueError:
+        print("Invalid input. Using default value of 1.")
+    
     for i in range(0, 100):
-        stats = run_simulation()
+        stats = run_simulation(num_channels)
         df = stats.df.copy()
         df['Run'] = i
         all_dfs.append(df)
@@ -148,4 +167,4 @@ def get_100_simulation_results():
     print(f"💔 Average Lost Clients: {avg_lost:.0f}")
 
 get_simulation_results()
-# get_100_simulation_results()
+#get_100_simulation_results()

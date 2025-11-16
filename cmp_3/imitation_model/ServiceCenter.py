@@ -4,6 +4,7 @@ import numpy as np
 from Print import GREEN, RED, RESET
 from Stats import Stats
 
+WORKER_PAYMENT = 100
 MAX_QUEUE = 12
 STEP = 1
 WORK_HOURS_FRAMES = {
@@ -13,7 +14,7 @@ WORK_HOURS_FRAMES = {
 }
 
 class ServiceCenter(object):
-    def __init__(self, current_time):
+    def __init__(self, current_time, channels):
         self.current_time = current_time
         self.current_client = Client()
         self.served_clients = 0
@@ -21,8 +22,10 @@ class ServiceCenter(object):
         self.lost_clients = 0
         self.profit = 0
         self.max_que = MAX_QUEUE
+        self.channels = channels
+        self.worker_payment = WORKER_PAYMENT
         self.queue = 0
-        self.statistics = Stats();
+        self.statistics = Stats()
     
     def next_hour(self):
         self.current_time += datetime.timedelta(hours=STEP)
@@ -34,6 +37,7 @@ class ServiceCenter(object):
         self.arrived_clients = 0
         self.lost_clients = 0
         self.current_client.device = None
+        self.profit -= self.worker_payment * self.channels
     
     def client_arrived(self):
         is_end_of_day = self.current_time.hour == WORK_HOURS_FRAMES.get("17-18")[1]
@@ -66,28 +70,35 @@ class ServiceCenter(object):
     
     def service_client(self):
         avaiable_time = 60 * STEP
+        channels_available = [avaiable_time] * self.channels
+
         
         print("\n📋 Devices in Queue")
         
-        while self.queue > 0 and avaiable_time > 0:
-            if (not self.current_client.device or self.current_client.device.is_fixed):
-                self.current_client.set_up_device();
-                self.queue -= 1
-                self.served_clients += 1
-                self.statistics.change_info(self.current_time, self.arrived_clients, self.lost_clients,
-                    self.queue, self.current_client.device.price)
-            
-            avaiable_time -= self.current_client.device.time_to_repair_in_minutes
-            
-            if (avaiable_time >= 0):
-                self.current_client.device.is_fixed = True
-                self.current_client.device.time_to_repair_in_minutes = 0;
-                self.profit +=  self.current_client.device.price
-            else:
-                self.current_client.device.time_to_repair_in_minutes += avaiable_time;
-                self.current_client.device.is_fixed = False
-                avaiable_time = 0
-            self.current_client.get_device_info();
+        while self.queue > 0 and any(time > 0 for time in channels_available):
+        # Find a free channel
+            for channel_idx in range(self.channels):
+                if channels_available[channel_idx] > 0 and self.queue > 0:
+                    if (not self.current_client.device or self.current_client.device.is_fixed):
+                        self.current_client.set_up_device()
+                        self.queue -= 1
+                        self.served_clients += 1
+                        self.statistics.change_info(self.current_time, self.arrived_clients, 
+                            self.lost_clients, self.queue, self.current_client.device.price)
+                    
+                    repair_time = self.current_client.device.time_to_repair_in_minutes
+                    channels_available[channel_idx] -= repair_time
+                    
+                    if channels_available[channel_idx] >= 0:
+                        self.current_client.device.is_fixed = True
+                        self.current_client.device.time_to_repair_in_minutes = 0
+                        self.profit += self.current_client.device.price
+                    else:
+                        self.current_client.device.time_to_repair_in_minutes = -channels_available[channel_idx]
+                        self.current_client.device.is_fixed = False
+                        channels_available[channel_idx] = 0
+                    
+                    self.current_client.get_device_info()
         
         print("---------------------------------------")
 
