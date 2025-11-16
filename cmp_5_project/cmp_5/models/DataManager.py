@@ -4,12 +4,16 @@ from pandas.plotting import scatter_matrix
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import  KNeighborsClassifier
 from sklearn.ensemble import  RandomForestClassifier
-from sklearn.metrics import  confusion_matrix, classification_report, ConfusionMatrixDisplay
-from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import  confusion_matrix, classification_report, ConfusionMatrixDisplay, silhouette_score, davies_bouldin_score
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.cluster import KMeans
+from tabulate import tabulate
+from collections import Counter
 import numpy as np
 
 LABEL_CLASS = "Level"
 NEIGHBORS = 3
+CLASSES = 3
 CORRELATION_THRESHOLD=0.5
 
 class DataManager:
@@ -20,6 +24,7 @@ class DataManager:
         self.test_characteristics = None
         self.test_classes = None
         self.classificator = None
+        self.clusterer = None
     
     def clean(self):
         self.data_frame = self.data_frame.drop(columns=["index", "Patient Id"], errors='ignore')
@@ -224,3 +229,91 @@ class DataManager:
             print("\n 💡 Nearest label: ", nearest_label)
             print("\n 🚀 Distance: ", nearest_distance_index)
             print("\n  ====================================== \n")
+    
+    def build_cluster(self, clusters = CLASSES, scale = None):
+        standard_scaler = StandardScaler()
+        min_max_scaler = MinMaxScaler()
+        data = data = self.data_frame.drop(columns=['index', 'Patient Id', LABEL_CLASS, "cluster"], errors='ignore').values
+        
+        
+        if scale == "standard":
+            data = standard_scaler.fit_transform(data)
+        elif scale == "min/max":
+            data = min_max_scaler.fit_transform(data)
+        
+        self.clusterer = KMeans(n_clusters = clusters)
+        self.clusterer.fit(data)
+        
+        return data
+    
+    def analyze_cluster_results(self, data):
+        predictions = self.clusterer.predict(data)
+        self.data_frame["cluster"] = predictions;
+        count = Counter(self.clusterer.labels_)
+        
+        cluster_content = self.data_frame.groupby(["cluster", LABEL_CLASS]).size().unstack(fill_value=0)
+        cluster_content["Total"] = cluster_content.sum(axis=1)
+        cluster_content.loc["Total"] = cluster_content.sum()
+        
+        print("\n  🗓️ Data Frame ======================== \n")
+        print(self.data_frame)
+        print("\n  ====================================== \n")
+        
+        
+        print("\n  Clusters =========================== \n")
+        print("\n  🧮 Cluster counts: ", count)
+        print("\n")
+        print(tabulate(cluster_content, headers="keys", tablefmt="psql"))
+        print("\n  ====================================== \n")
+        
+        centroids = self.clusterer.cluster_centers_
+        
+        print("\n  ❌ Centroids: =========================== \n")
+        print(centroids)
+        print("\n  ====================================== \n")
+        
+        feature_pairs = [(0, 1),
+                        (2, 3),
+                        (4, 5),
+                        (6, 7),
+                        (8, 9),
+                        (10, 11)]
+        
+        
+        fig, ax = plt.subplots(2, 3, figsize=(12,10))
+        axes = ax.flatten()
+
+        for i, (x, y) in enumerate(feature_pairs):
+            ax_ = axes[i]
+            scatter1 = ax_.scatter(data[:, x], data[:, y], c=predictions, s=15, cmap='viridis')
+            handles, labels = scatter1.legend_elements()
+                
+            legend1 = ax_.legend(handles, labels, loc="upper right")
+            ax_.add_artist(legend1)
+                
+            ax_.scatter(centroids[:, x], centroids[:, y], marker='X', c='red', s=200, linewidths=3, label='centroids')
+            ax_.legend(loc='lower right')
+            ax_.set_xlabel(f"{self.data_frame.columns[x]}")
+            ax_.set_ylabel(f"{self.data_frame.columns[y]}")
+            
+        plt.tight_layout()
+        plt.show()
+    
+    def find_optimal_cluster_amount(self):
+        
+        results = []
+        
+        for k in range(2, 10):
+            data = self.build_cluster(clusters=k)
+            
+            labels = self.clusterer.fit_predict(data)
+            
+            inertia_score = self.clusterer.inertia_
+            sil_score = silhouette_score(data, labels)
+            davies_score = davies_bouldin_score(data, labels)
+            
+            results.append([k, inertia_score, sil_score, davies_score])
+
+        df_results = pd.DataFrame(results, columns=["Clusters", "Intertia Score", "Silhoutte Score", "Davies Score"])
+        
+        print(df_results)
