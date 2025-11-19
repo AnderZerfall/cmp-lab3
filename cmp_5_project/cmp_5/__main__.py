@@ -72,7 +72,7 @@ def run_cluster_model():
 
 
 def main() -> None:
-    print("Start coding in Python today!")
+    #run_classification_model()
     run_cluster_model()
 
 
